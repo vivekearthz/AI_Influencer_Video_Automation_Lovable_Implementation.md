@@ -38,9 +38,11 @@ src/                      React app
 
 supabase/
   migrations/             Every table, RLS policy, and seed data (numbered, spec §69)
-  functions/              Edge Functions (Deno) — one per spec §47 endpoint
+  functions/              Edge Functions (Deno) — one per spec §47 endpoint, plus campaign-orchestrator
     _shared/               Provider clients, router, cost controller, audit log, idempotency
+  cron/                   pg_cron setup script + README comparing cron mechanisms
 
+.github/workflows/        GitHub Actions cron alternative for campaign-orchestrator
 workers/render-worker/    Standalone Node + FFmpeg service for video assembly
 docs/                     Original implementation specification
 ```
@@ -73,15 +75,21 @@ npm run dev
    supabase functions deploy script-generate presenter-generate video-generate \
      video-status video-render video-qc caption-generate campaign-create \
      campaign-approve social-publish social-health-check provider-health-check \
-     campaign-status whatsapp-send email-send webhooks-social webhooks-whatsapp \
-     webhooks-email webhooks-ai
+     campaign-status whatsapp-send email-send campaign-orchestrator \
+     webhooks-social webhooks-whatsapp webhooks-email webhooks-ai
    ```
+   `campaign-orchestrator` and the four `webhooks-*` functions are configured
+   with `verify_jwt = false` in `supabase/config.toml` since they're called
+   by cron/third parties rather than a logged-in user; they authenticate
+   themselves instead (a shared secret for the orchestrator, HMAC signatures
+   for webhooks).
 4. Set Edge Function secrets for whichever providers you actually use (never
    commit these, never prefix with `VITE_`):
    ```bash
    supabase secrets set GEMINI_API_KEY=... ELEVENLABS_API_KEY=... \
      WHATSAPP_ACCESS_TOKEN=... WHATSAPP_PHONE_NUMBER_ID=... \
-     EMAIL_PROVIDER_KEY=... EMAIL_FROM_ADDRESS=...
+     EMAIL_PROVIDER_KEY=... EMAIL_FROM_ADDRESS=... \
+     ORCHESTRATOR_CRON_SECRET=$(openssl rand -hex 32)
    ```
    See `.env.example` for the full list. A provider only becomes usable once
    its secret is present — the Providers page runs a live health check and
@@ -91,6 +99,17 @@ npm run dev
 
 Deploy `workers/render-worker` (Docker image included) to any always-on
 container host. See `workers/render-worker/README.md`.
+
+### 4. Automatic pipeline advancement (cron)
+
+A campaign doesn't advance itself just by existing — something needs to
+call `campaign-orchestrator` on a timer so script → presenter → video →
+render → QC → captions happen automatically, and approved/scheduled
+campaigns actually get published at the right time without anyone clicking
+through the UI. See **`supabase/cron/README.md`** for three ways to wire
+this up (pg_cron + pg_net from inside Postgres, a GitHub Actions workflow
+already included at `.github/workflows/campaign-orchestrator-cron.yml`, or
+any external HTTP cron pinger) — pick whichever fits your environment.
 
 ## Security & compliance guardrails baked in
 

@@ -29,6 +29,24 @@ enable_confirmations = false
 [functions]
 enabled = true
 
+# The orchestrator is invoked by pg_cron / GitHub Actions / any external
+# cron pinger, never by a logged-in user, so it authenticates via a shared
+# secret header (ORCHESTRATOR_CRON_SECRET) instead of a Supabase JWT.
+[functions.campaign-orchestrator]
+verify_jwt = false
+
+# Inbound webhooks come from third-party providers (Meta, WhatsApp, email,
+# social publishers) that cannot present a Supabase JWT. Each one verifies
+# its own HMAC signature instead (see supabase/functions/_shared/webhookSignature.ts).
+[functions.webhooks-whatsapp]
+verify_jwt = false
+[functions.webhooks-social]
+verify_jwt = false
+[functions.webhooks-email]
+verify_jwt = false
+[functions.webhooks-ai]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 policy = "oneshot"
