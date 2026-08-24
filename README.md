@@ -1,0 +1,2 @@
+# AI_Influencer_Video_Automation_Lovable_Implementation.md
+AI_Influencer_Video_Automation_Lovable_Implementation.md
