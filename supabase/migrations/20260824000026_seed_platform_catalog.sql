@@ -1,0 +1,87 @@
+-- -----------------------------------------------------------------------------
+-- Seed the 24-channel platform catalog (spec §9, §54-56). `publisher_tier`
+-- reflects what is realistically available today:
+--   native_api    -> official platform API exists and is implementable directly
+--   third_party   -> best reached through an approved publisher (Ayrshare/
+--                    Buffer/Publer/Metricool) rather than a bespoke integration
+--   manual        -> no reliable public posting API; goes to the human
+--                    approval queue by default
+-- This table drives the UI automatically — adding/removing a channel here
+-- never requires a code change (spec §54 "should not require code changes").
+-- -----------------------------------------------------------------------------
+
+insert into public.platform_catalog (platform_key, display_name, publisher_tier, capabilities, oauth_supported, docs_url, sort_order)
+values
+  ('instagram', 'Instagram', 'native_api',
+    '{"text": true, "image": true, "video": true, "stories": true, "reels": true, "shorts": false, "scheduled": true, "direct_publish": true}',
+    true, 'https://developers.facebook.com/docs/instagram-platform', 10),
+  ('facebook', 'Facebook', 'native_api',
+    '{"text": true, "image": true, "video": true, "stories": true, "reels": true, "shorts": false, "scheduled": true, "direct_publish": true}',
+    true, 'https://developers.facebook.com/docs/graph-api', 20),
+  ('linkedin', 'LinkedIn', 'native_api',
+    '{"text": true, "image": true, "video": true, "stories": false, "reels": false, "shorts": false, "scheduled": true, "direct_publish": true}',
+    true, 'https://learn.microsoft.com/en-us/linkedin/marketing/', 30),
+  ('youtube', 'YouTube', 'native_api',
+    '{"text": true, "image": true, "video": true, "stories": false, "reels": false, "shorts": true, "scheduled": true, "direct_publish": true}',
+    true, 'https://developers.google.com/youtube/v3', 40),
+  ('tiktok', 'TikTok', 'native_api',
+    '{"text": true, "image": false, "video": true, "stories": false, "reels": false, "shorts": true, "scheduled": false, "direct_publish": true}',
+    true, 'https://developers.tiktok.com/doc/content-posting-api-get-started', 50),
+  ('x', 'X (Twitter)', 'native_api',
+    '{"text": true, "image": true, "video": true, "stories": false, "reels": false, "shorts": false, "scheduled": true, "direct_publish": true}',
+    true, 'https://developer.x.com/en/docs', 60),
+  ('pinterest', 'Pinterest', 'native_api',
+    '{"text": true, "image": true, "video": true, "stories": false, "reels": false, "shorts": false, "scheduled": true, "direct_publish": true}',
+    true, 'https://developers.pinterest.com/docs/api/v5/', 70),
+  ('threads', 'Threads', 'native_api',
+    '{"text": true, "image": true, "video": true, "stories": false, "reels": false, "shorts": false, "scheduled": false, "direct_publish": true}',
+    true, 'https://developers.facebook.com/docs/threads', 80),
+  ('reddit', 'Reddit', 'native_api',
+    '{"text": true, "image": true, "video": true, "stories": false, "reels": false, "shorts": false, "scheduled": false, "direct_publish": true}',
+    true, 'https://www.reddit.com/dev/api/', 90),
+  ('telegram', 'Telegram Channel', 'native_api',
+    '{"text": true, "image": true, "video": true, "stories": false, "reels": false, "shorts": false, "scheduled": false, "direct_publish": true}',
+    false, 'https://core.telegram.org/bots/api', 100),
+  ('discord', 'Discord', 'native_api',
+    '{"text": true, "image": true, "video": true, "stories": false, "reels": false, "shorts": false, "scheduled": false, "direct_publish": true}',
+    false, 'https://discord.com/developers/docs/resources/webhook', 110),
+  ('google_business_profile', 'Google Business Profile', 'native_api',
+    '{"text": true, "image": true, "video": false, "stories": false, "reels": false, "shorts": false, "scheduled": false, "direct_publish": true}',
+    true, 'https://developers.google.com/my-business/', 120),
+  ('mastodon', 'Mastodon', 'native_api',
+    '{"text": true, "image": true, "video": true, "stories": false, "reels": false, "shorts": false, "scheduled": true, "direct_publish": true}',
+    true, 'https://docs.joinmastodon.org/api/', 130),
+  ('bluesky', 'Bluesky', 'native_api',
+    '{"text": true, "image": true, "video": true, "stories": false, "reels": false, "shorts": false, "scheduled": false, "direct_publish": true}',
+    false, 'https://docs.bsky.app/', 140),
+  ('tumblr', 'Tumblr', 'native_api',
+    '{"text": true, "image": true, "video": true, "stories": false, "reels": false, "shorts": false, "scheduled": true, "direct_publish": true}',
+    true, 'https://www.tumblr.com/docs/en/api/v2', 150),
+  ('medium', 'Medium', 'native_api',
+    '{"text": true, "image": true, "video": false, "stories": false, "reels": false, "shorts": false, "scheduled": false, "direct_publish": true}',
+    true, 'https://github.com/Medium/medium-api-docs', 160),
+  ('wordpress_blog', 'WordPress Blog', 'native_api',
+    '{"text": true, "image": true, "video": true, "stories": false, "reels": false, "shorts": false, "scheduled": true, "direct_publish": true}',
+    true, 'https://developer.wordpress.org/rest-api/', 170),
+  ('vimeo', 'Vimeo', 'native_api',
+    '{"text": true, "image": true, "video": true, "stories": false, "reels": false, "shorts": false, "scheduled": false, "direct_publish": true}',
+    true, 'https://developer.vimeo.com/api/reference', 180),
+  ('snapchat', 'Snapchat', 'third_party',
+    '{"text": false, "image": true, "video": true, "stories": true, "reels": false, "shorts": false, "scheduled": true, "direct_publish": false}',
+    false, 'https://developers.snap.com/', 190),
+  ('twitch', 'Twitch', 'manual',
+    '{"text": true, "image": false, "video": false, "stories": false, "reels": false, "shorts": false, "scheduled": false, "direct_publish": false}',
+    false, 'https://dev.twitch.tv/docs/api/', 200),
+  ('quora', 'Quora Spaces', 'manual',
+    '{"text": true, "image": true, "video": false, "stories": false, "reels": false, "shorts": false, "scheduled": false, "direct_publish": false}',
+    false, null, 210),
+  ('nextdoor', 'Nextdoor', 'manual',
+    '{"text": true, "image": true, "video": false, "stories": false, "reels": false, "shorts": false, "scheduled": false, "direct_publish": false}',
+    false, null, 220),
+  ('wechat', 'WeChat Official Account', 'manual',
+    '{"text": true, "image": true, "video": true, "stories": false, "reels": false, "shorts": false, "scheduled": false, "direct_publish": false}',
+    false, null, 230),
+  ('line', 'LINE Official Account', 'manual',
+    '{"text": true, "image": true, "video": true, "stories": false, "reels": false, "shorts": false, "scheduled": false, "direct_publish": false}',
+    false, 'https://developers.line.biz/en/docs/messaging-api/', 240)
+on conflict (platform_key) do nothing;
