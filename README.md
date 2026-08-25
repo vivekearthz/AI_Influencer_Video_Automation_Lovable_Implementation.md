@@ -142,3 +142,30 @@ any external HTTP cron pinger) — pick whichever fits your environment.
 - Adding a 25th social channel is a `platform_catalog` insert, not a code
   change; native adapters live in `supabase/functions/_shared/social/*` if
   you want to add a bespoke integration for it later.
+
+## Working with Lovable (branches, not just `main`)
+
+Lovable's GitHub sync only ever edits and syncs **one branch at a time**,
+and defaults to the repository's default branch (usually `main`). It does
+**not** automatically watch or pick up other branches — that's inherent to
+how every Lovable project's GitHub integration works, not something
+specific to this repo. If a Lovable project only ever shows/commits to
+`main` and never reflects work pushed to a branch like this one, that's
+expected until one of the following happens:
+
+- **Merge this branch's PR into `main`.** Once merged, the next sync (or
+  reopening the Lovable project) picks up the new commits on `main`
+  automatically. Simplest option if you only want one Lovable project for
+  this app.
+- **Point a Lovable project at this branch directly**, without merging:
+  in that Lovable project, go to **Settings → GitHub**, use the branch
+  picker, and select `cursor/ai-influencer-video-automation-d753`. Lovable
+  immediately switches to editing/syncing that branch instead of `main`.
+  (If you don't see a branch picker, enable it first under **Account
+  Settings → Labs → GitHub Branch Switching**.)
+
+This repository also hosts a second, unrelated app (InfluenceOS) on its own
+branch — each app needs its **own** Lovable project connected to this same
+GitHub repo but synced to its own branch, since a single Lovable project
+only tracks one branch and expects the app's files at the repo root (both
+apps' branches are laid out that way for exactly this reason).
