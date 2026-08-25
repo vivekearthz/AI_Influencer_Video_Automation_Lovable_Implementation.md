@@ -1,6 +1,6 @@
-// Hand-written mirror of influenceos/supabase/migrations/*.sql. Regenerate
-// with `supabase gen types typescript --local` once linked to a real
-// project for full accuracy.
+// Hand-written mirror of supabase/migrations/*.sql. Regenerate with
+// `supabase gen types typescript --local` once linked to a real project
+// for full accuracy.
 
 type Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
   Row: Row;
