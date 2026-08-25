@@ -19,8 +19,8 @@ Brand searches/filters creators → shortlists → sends collab offer
 > both be root-level on the same branch — so InfluenceOS lives here, under
 > `influenceos/`, on `main`. If you want to run/deploy InfluenceOS as its
 > own root-level Lovable project instead, use the dedicated
-> `cursor/influenceos-marketplace-d753` branch, which has this same app at
-> the repo root.
+> `cursor/influenceos-marketplace-root-d753` branch, which has this same
+> app at the repo root.
 
 ## Stack
 

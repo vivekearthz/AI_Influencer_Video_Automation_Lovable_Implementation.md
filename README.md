@@ -7,6 +7,12 @@ scheduled/published package across up to 24 social channels.
 Implements the specification in
 [`docs/AI_Influencer_Video_Automation_Lovable_Implementation.md`](docs/AI_Influencer_Video_Automation_Lovable_Implementation.md).
 
+> **This branch (`main`) also hosts a second, unrelated app: InfluenceOS**
+> (a creator/brand marketplace — see [`influenceos/README.md`](influenceos/README.md)),
+> nested under `influenceos/` so both apps can coexist on one branch. This
+> app (AI Video Studio) is the one at the repo root. See "Working with
+> Lovable" below for what that means for Lovable syncing.
+
 ```
 Campaign Brief → AI Script → Presenter/Scene Planner → Video Provider Selection
 → Video Generation Queue → Voice/Native Audio → Brand Overlay (FFmpeg)
@@ -44,7 +50,8 @@ supabase/
 
 .github/workflows/        GitHub Actions cron alternative for campaign-orchestrator
 workers/render-worker/    Standalone Node + FFmpeg service for video assembly
-docs/                     Original implementation specification
+docs/                     Original implementation specifications (this app + InfluenceOS)
+influenceos/              A second, unrelated app (creator/brand marketplace) — see influenceos/README.md
 ```
 
 ## Getting started
@@ -143,29 +150,27 @@ any external HTTP cron pinger) — pick whichever fits your environment.
   change; native adapters live in `supabase/functions/_shared/social/*` if
   you want to add a bespoke integration for it later.
 
-## Working with Lovable (branches, not just `main`)
+## Working with Lovable
 
-Lovable's GitHub sync only ever edits and syncs **one branch at a time**,
-and defaults to the repository's default branch (usually `main`). It does
-**not** automatically watch or pick up other branches — that's inherent to
-how every Lovable project's GitHub integration works, not something
-specific to this repo. If a Lovable project only ever shows/commits to
-`main` and never reflects work pushed to a branch like this one, that's
-expected until one of the following happens:
+Lovable's GitHub sync only ever edits and syncs **one branch at a time**
+per project, and treats the repository root as "the project" (it can't
+run an app that lives in a subdirectory). Both matter here because this
+repo now hosts two apps:
 
-- **Merge this branch's PR into `main`.** Once merged, the next sync (or
-  reopening the Lovable project) picks up the new commits on `main`
-  automatically. Simplest option if you only want one Lovable project for
-  this app.
-- **Point a Lovable project at this branch directly**, without merging:
-  in that Lovable project, go to **Settings → GitHub**, use the branch
-  picker, and select `cursor/ai-influencer-video-automation-d753`. Lovable
-  immediately switches to editing/syncing that branch instead of `main`.
-  (If you don't see a branch picker, enable it first under **Account
-  Settings → Labs → GitHub Branch Switching**.)
+- **AI Video Studio** (this one) — lives at the repo **root** on `main`.
+  A Lovable project synced to `main` (Lovable's default branch) will pick
+  this app up correctly.
+- **InfluenceOS** — lives under `influenceos/` on `main`, so it is **not**
+  directly usable by a Lovable project synced to `main` (Lovable won't
+  look inside a subfolder). To run InfluenceOS as its own Lovable project,
+  point that project's GitHub branch picker at
+  `cursor/influenceos-marketplace-root-d753` instead, which has
+  InfluenceOS at the repo root. (**Settings → GitHub** in the Lovable
+  project → branch picker → select that branch; enable **Account Settings
+  → Labs → GitHub Branch Switching** first if the picker isn't visible.)
 
-This repository also hosts a second, unrelated app (InfluenceOS) on its own
-branch — each app needs its **own** Lovable project connected to this same
-GitHub repo but synced to its own branch, since a single Lovable project
-only tracks one branch and expects the app's files at the repo root (both
-apps' branches are laid out that way for exactly this reason).
+Going forward, all Cursor updates for this app are pushed straight to
+`main` (the branch this Lovable project already syncs), so there's no more
+branch mismatch between Cursor and Lovable for this app. InfluenceOS
+updates go to `cursor/influenceos-marketplace-root-d753` for the same
+reason, kept in sync with the copy under `influenceos/` on `main`.
