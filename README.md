@@ -174,3 +174,19 @@ Going forward, all Cursor updates for this app are pushed straight to
 branch mismatch between Cursor and Lovable for this app. InfluenceOS
 updates go to `cursor/influenceos-marketplace-root-d753` for the same
 reason, kept in sync with the copy under `influenceos/` on `main`.
+
+### If Lovable's GitHub connection breaks (404 on reconnect)
+
+See [`docs/integration-connections.md`](docs/integration-connections.md) for:
+
+- the full ledger of which app syncs to which branch and Supabase project,
+- why a persistent 404 when reconnecting happens (stale repo reference,
+  revoked/uninstalled GitHub App access, org SSO enforcement, or a
+  Lovable-side bug) and the exact manual steps to clear each cause, and
+- [`.github/workflows/sync-health-selfheal.yml`](.github/workflows/sync-health-selfheal.yml),
+  a scheduled monitor (`scripts/check-sync-health.mjs`) that watches for the
+  GitHub-side symptoms of a broken sync — a missing sync branch, or an app's
+  files disappearing from the root of its branch — with retries and a
+  self-resetting tracking issue, so a break is caught immediately even
+  though re-authorizing Lovable's GitHub App is always a manual, one-time
+  step that only an account owner can complete.
