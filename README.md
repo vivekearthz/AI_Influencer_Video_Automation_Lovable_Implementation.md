@@ -181,8 +181,13 @@ See [`docs/integration-connections.md`](docs/integration-connections.md) for:
 
 - the full ledger of which app syncs to which branch and Supabase project,
 - why a persistent 404 when reconnecting happens (stale repo reference,
-  revoked/uninstalled GitHub App access, org SSO enforcement, or a
-  Lovable-side bug) and the exact manual steps to clear each cause, and
+  revoked/uninstalled GitHub App access, org SSO enforcement, repo-recreation
+  churn, or a Lovable-side bug) and the exact manual steps to clear each
+  cause,
+- `scripts/audit-account-repos.mjs`, a manual, account-wide diagnostic (run
+  by hand with a broader token — never in CI) that quantifies repo-churn
+  patterns and checks branch protection/webhooks/force-pushes on this repo,
+  and
 - [`.github/workflows/sync-health-selfheal.yml`](.github/workflows/sync-health-selfheal.yml),
   a scheduled monitor (`scripts/check-sync-health.mjs`) that watches for the
   GitHub-side symptoms of a broken sync — a missing sync branch, or an app's
