@@ -111,6 +111,22 @@ GH_PERSONAL_ACCESS_TOKEN=<token> GITHUB_REPOSITORY=<owner>/<repo> \
    **Recommend rotating it for a narrower one** (classic PAT with just
    `repo`, or a fine-grained PAT scoped to read-only Contents/Metadata/
    Webhooks) the next time it's regenerated.
+6. **Push-recency cannot identify which repo in a cluster is actually
+   still connected to Lovable, on this account.** A separate account-level
+   automated process (confirmed by the account owner to be an intentional
+   internal tool, unrelated to Lovable or GitHub Apps) pushes a version-sync
+   commit into most/all repos in a cluster on roughly the same daily
+   schedule — so an abandoned duplicate and the one real, currently-synced
+   repo end up with near-identical `pushed_at` timestamps. An earlier
+   ranking based on push recency is therefore **not reliable** and
+   shouldn't be acted on. `scripts/reconcile-lovable-repos.mjs` fixes this
+   by cross-referencing against the one source of truth that actually
+   exists: each Lovable project's own **Settings → GitHub** screen, which
+   must be read manually (there is no API for it) into a small JSON file
+   once, after which the script automates the rest — matching every
+   cluster, flagging orphans with no matching Lovable project, and (only
+   with an explicit `--confirm` flag) **archiving** — never deleting —
+   exactly those orphans.
 
 ## Why "Lovable GitHub 404 on reconnect" happens, and why no script can fix it end-to-end
 
