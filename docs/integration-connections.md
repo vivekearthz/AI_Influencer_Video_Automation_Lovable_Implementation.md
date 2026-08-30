@@ -62,22 +62,27 @@ GH_PERSONAL_ACCESS_TOKEN=<token> GITHUB_REPOSITORY=<owner>/<repo> \
   node scripts/audit-account-repos.mjs [--verbose]
 ```
 
-**Findings from the most recent run against this account:**
+**Findings from the most recent run against this account** (re-verified
+2026-08-30 — same conclusion as the original run, so this is a persistent
+account condition, not a one-off blip):
 
 1. **Strong repo-churn signature at the account level.** A large share of
    this account's repositories (measured as clusters of repos sharing a
    base name plus a random 8-character suffix — Lovable's own auto-naming
-   convention) are duplicate-name clusters, not one-off names. That is a
-   concrete, quantified symptom consistent with **Lovable's "reconnect" or
-   "new project" flow creating a brand-new GitHub repo instead of truly
-   reconnecting to the existing one**, every time a connection issue is hit
-   and "fixed." If that's what's happening, the 404s are a *side effect*:
-   each fresh attempt spawns a new repo, so whatever repo/owner Lovable
-   still remembers internally for a given project can go stale again almost
-   immediately. This is the most actionable new lead from this audit —
-   **worth checking directly in Lovable's own project/version history**
-   (does every "reconnect" show up there as a brand-new GitHub repo link,
-   with a new random name, rather than the same repo reappearing?).
+   convention) are duplicate-name clusters, not one-off names. On the
+   2026-08-30 run: 264 total repos, 134 distinct base-name clusters, 24 of
+   those clusters containing duplicates, 154 repos (58%) living inside a
+   duplicate cluster. That is a concrete, quantified symptom consistent with
+   **Lovable's "reconnect" or "new project" flow creating a brand-new GitHub
+   repo instead of truly reconnecting to the existing one**, every time a
+   connection issue is hit and "fixed." If that's what's happening, the 404s
+   are a *side effect*: each fresh attempt spawns a new repo, so whatever
+   repo/owner Lovable still remembers internally for a given project can go
+   stale again almost immediately. This is the most actionable new lead from
+   this audit — **worth checking directly in Lovable's own project/version
+   history** (does every "reconnect" show up there as a brand-new GitHub
+   repo link, with a new random name, rather than the same repo
+   reappearing?).
 2. **This specific repository shows no sign of ever being Lovable-managed.**
    Across every branch, the only commit authors are the Cursor agent and
    the account owner — never a bot account with "lovable" in its name or
@@ -179,6 +184,78 @@ required files at the sync root) plus a retrying, self-resetting alert loop
 — so the *next* break is caught immediately instead of silently, even though
 the *reconnect action itself* still has to be a human clicking through
 GitHub's and Lovable's consent screens.
+
+## An official, actually-programmatic control channel: the Lovable MCP server
+
+Everything above is about the **GitHub side** of the sync (detecting
+symptoms, auditing repo churn). Separately, and new since the original audit
+above, Lovable now ships an **official** remote MCP (Model Context Protocol)
+server at `https://mcp.lovable.dev` — this is the real "alternate mechanism
+to control Lovable projects programmatically" that a request like this is
+usually looking for, and it is sanctioned by Lovable itself (unlike scraping
+Lovable's internal web API, see the warning below).
+
+Once a human connects it (one-time OAuth, see below), any MCP-capable AI
+client — Cursor, Claude, ChatGPT, VS Code — gets tools to, across **every
+project in the account**, not just this repo:
+
+- `list_workspaces` / `list_projects` / `get_project` — enumerate every
+  Lovable project, its status, preview/editor URLs, and a live screenshot.
+- `send_message` — send a prompt straight to a project's Lovable AI agent
+  (e.g. "fix the failing build" or "there's a null-pointer bug on the
+  checkout page") and wait for it to finish the edit. This is the direct
+  answer to "ensure they are fully updated and bug-free" — it lets an agent
+  actually drive Lovable's own builder against each project, not just watch
+  GitHub for symptoms.
+- `get_diff` / `list_files` / `read_file` / `list_edits` — inspect a
+  project's code and edit history without needing GitHub sync to be working
+  at all.
+- `deploy_project` — publish a project and get the live URL back.
+- `get_database_status` / `enable_database` / `query_database` — inspect or
+  modify a project's Lovable Cloud (Supabase) database.
+- `list_connectors` / `list_connections` — see what's wired into a
+  workspace.
+
+**How to connect it (one-time, human step — cannot be done by an
+unattended/headless agent):** this repo now ships
+[`.cursor/mcp.json`](../.cursor/mcp.json) with the server pre-configured, so
+opening this repo in Cursor is enough to make the "lovable" MCP tools appear
+— but the first call still opens an interactive OAuth browser window for
+whoever is running Cursor, exactly like GitHub App authorization. Cursor
+Cloud Agents run headless with no browser, so a cloud agent session can add
+the config file but cannot itself complete that OAuth handshake; a human
+finishes sign-in once, after which every subsequent session (agent or
+human) in that Cursor account reuses the token. Full setup steps for other
+clients (Claude, ChatGPT, VS Code) are at
+[docs.lovable.dev/integrations/lovable-mcp-server](https://docs.lovable.dev/integrations/lovable-mcp-server).
+
+Two important caveats straight from Lovable's own docs:
+
+- **Scope is the whole account, not one project.** Whatever client
+  authenticates gets the signed-in user's full permissions across every
+  workspace and project — list, read, edit, deploy, run arbitrary SQL. Only
+  connect it from a client/account you trust with that.
+- **API-key auth is explicitly not supported for this server** ("Can I
+  connect with an API key? ... OAuth is the only supported way to connect
+  to the Lovable MCP server" — official FAQ, checked 2026-08-30). Anything
+  claiming otherwise for `mcp.lovable.dev` specifically is wrong or stale.
+
+### What NOT to do: unofficial token-extraction tools
+
+While researching this, community tooling exists (e.g. a third-party CLI
+that pulls a live Firebase refresh token out of a logged-in browser's
+IndexedDB to call Lovable's *internal* web API directly, bypassing both
+OAuth consent screens and the official MCP server) that would, in theory,
+let a headless agent act on a Lovable account without any interactive step.
+**This repo deliberately does not use, script, or recommend that
+approach.** A stolen/extracted refresh token is equivalent to full,
+long-lived account takeover with no scoping and no easy revocation path
+short of the user changing their Lovable credentials; relying on
+reverse-engineered internal endpoints that "may change without notice" and
+were never sanctioned by Lovable is also just fragile. The officially
+supported OAuth-based MCP server above gets the same practical outcome
+(programmatic control) through a channel Lovable actually maintains and can
+audit/revoke normally.
 
 ## Supabase
 
