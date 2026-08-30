@@ -143,22 +143,63 @@ GitHub-App consent model that stops any third party (including an AI agent)
 from re-authorizing access on an account owner's behalf. Concretely, a
 persistent 404 when reconnecting is almost always one of:
 
-1. **The Lovable GitHub App lost access to the repo/org** — it was
-   uninstalled, the org switched "GitHub App access" from "All repositories"
-   to "Only select repositories" and this repo wasn't re-added, or an org
-   owner revoked it. Fix: account/org **Settings → Applications → Installed
-   GitHub Apps → Lovable** → confirm it's installed and has this repository
-   in its access list; reinstall/grant access if not.
+1. **The Lovable GitHub App lost access to the repo/org.** Confirmed exact
+   causes and fixes, straight from Lovable's own docs
+   ([docs.lovable.dev/integrations/github#troubleshooting](https://docs.lovable.dev/integrations/github#troubleshooting),
+   checked 2026-08-30):
+   - **GitHub App fully uninstalled** — if `https://github.com/settings/installations`
+     does not list "Lovable" at all, someone (or GitHub itself, e.g. after
+     an org ownership change) uninstalled it. Lovable's own message for
+     this: *"The Lovable GitHub App has been uninstalled. Reconnect to
+     reinstall it and restore access."* Fix, exactly as Lovable documents
+     it: (1) in Lovable, **Workspace settings → Git → GitHub → Add
+     connection** (workspace settings are reachable from
+     `https://lovable.dev/dashboard` → gear/Settings icon, or directly via
+     `https://lovable.dev/dashboard?connectors`); (2) reinstall the Lovable
+     GitHub App on the same account/org when GitHub's install popup opens
+     — **this creates a brand-new workspace connection**; (3) for each
+     project that used the old connection, open that project's **Settings
+     → Git → GitHub** and click **Connect** to link it to the new
+     connection — **this makes Lovable create a brand-new GitHub repo for
+     that project** (Lovable's own docs: *"Lovable creates a new GitHub
+     repository for the project"*). The old repo(s) are left on GitHub,
+     untouched but permanently unlinked.
+   - **App still installed but repo access excluded** — if Lovable *is*
+     listed at `https://github.com/settings/installations` but the
+     relevant repo isn't in its access list (e.g. someone flipped the
+     installation from "All repositories" to "Only select repositories").
+     Lovable's message: *"Lovable no longer has access to this repository.
+     Reconnect and grant access to it."* Fix: open the project's
+     **Settings → Git → GitHub** in Lovable, click **Reconnect** (this
+     opens `github.com`'s installation-settings page for the Lovable App
+     in a new tab), then under **Repository access** either pick **All
+     repositories** or add the missing repo to **Only select
+     repositories**. No new repo is created in this case — sync just
+     resumes.
+   - **App suspended, not uninstalled** — message *"The Lovable GitHub App
+     is suspended. Reconnect and unsuspend it to resume syncing."* Same
+     Reconnect-from-Lovable flow, then click **Unsuspend** on the app's
+     GitHub installation page.
 2. **Lovable's own "reconnect" flow creates a brand-new repo instead of
-   reconnecting** — see the account-wide audit above, which found strong,
-   quantified evidence of exactly this pattern (a large share of this
-   account's repos are duplicate-name clusters that look like the same
-   project recreated repeatedly). If so, every "fix" attempt makes the
-   *next* 404 more likely, since the repo backing a project keeps changing.
-   There's nothing to fix from the GitHub or repo side here — Lovable's own
-   support needs to confirm whether their "reconnect" and "new project"
-   flows are supposed to be idempotent, and if this account has accumulated
-   orphaned repos from prior failed attempts that are safe to delete.
+   reconnecting — confirmed, not just inferred.** The account-wide audit
+   above found strong statistical evidence of this (a large share of this
+   account's repos are duplicate-name clusters). Lovable's own
+   documentation now confirms it explicitly is by design, not a bug: every
+   "Add connection" after an uninstall, and every "Connect" of a project to
+   a (new) connection, is documented to create a new repository — Git sync
+   for GitHub **"does not support ... reconnecting to the same repository
+   after disconnecting. A new repository is created on reconnect."** So
+   every "fix the connection" pass is expected to leave one more orphaned
+   repo behind. There's nothing to fix from the GitHub or repo side here;
+   `scripts/reconcile-lovable-repos.mjs` above exists specifically to clean
+   up that expected fallout safely (archive-only, human-confirmed). If you
+   want to preserve a broken project's commit history in its new repo
+   instead of starting fresh, that's a manual git operation Lovable doesn't
+   automate — push the old repo's history into the new one yourself, e.g.
+   `git remote add old-history <old-repo-url> && git fetch old-history && git push origin old-history/main:main --force`
+   *before* Lovable starts editing the new repo (community-documented
+   workaround, not an official Lovable feature — see
+   [feedback.lovable.dev/p/integration-disconnection-after-github-username-update](https://feedback.lovable.dev/p/integration-disconnection-after-github-username-update)).
 3. **A stale repo reference inside Lovable** — the repo was renamed,
    transferred to a different owner, or deleted/recreated. GitHub keeps the
    old name working via redirects for normal git operations, but Lovable's
