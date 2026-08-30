@@ -1,0 +1,74 @@
+name: Music automation - approve/reject song
+
+# The one deliberate human touchpoint in the pipeline (see
+# music-automation/README.md "Zero-human-intervention mode" for how to turn
+# it off entirely with AUTO_APPROVE=true). Triggered by clicking "Run
+# workflow" from the link in the Slack notification -- no server, no
+# webhook receiver, no always-on process needed to accept the approval.
+
+on:
+  workflow_dispatch:
+    inputs:
+      songId:
+        description: "Song id from the Slack notification"
+        required: true
+        type: string
+      decision:
+        description: "approve or reject"
+        required: true
+        type: choice
+        options: [approve, reject]
+        default: approve
+      reason:
+        description: "Reason (only used for reject)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  decide:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: music-automation
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: music-automation/package-lock.json
+
+      - run: npm ci
+
+      - name: Record decision
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ "${{ inputs.decision }}" = "approve" ]; then
+            npm run cli -- approve "${{ inputs.songId }}"
+          else
+            npm run cli -- reject "${{ inputs.songId }}" "${{ inputs.reason }}"
+          fi
+
+      - name: Commit updated pipeline state
+        run: |
+          git config user.name "music-automation-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/songs.json 2>/dev/null || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(music-automation): ${{ inputs.decision }} song ${{ inputs.songId }} [skip ci]"
+            git push
+          else
+            echo "No state changes to commit."
+          fi
+
+      - name: Trigger the pipeline immediately so approved songs publish now
+        if: inputs.decision == 'approve'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run music-automation-cron.yml

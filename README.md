@@ -13,6 +13,14 @@ Implements the specification in
 > app (AI Video Studio) is the one at the repo root. See "Working with
 > Lovable" below for what that means for Lovable syncing.
 
+> **This branch also hosts a third, self-contained tool: music-automation**
+> (startup-story-to-song pipeline for InnoVexis Consulting / Dare to Law
+> founder-brand content — lyrics → AI music/vocals → lyric video → YouTube +
+> LinkedIn/Instagram/etc, scheduled for free on GitHub Actions) — see
+> [`music-automation/README.md`](music-automation/README.md). It has its own
+> `package.json` and doesn't share code with either app above, by design,
+> so it can be copied into any other repository as-is.
+
 ```
 Campaign Brief → AI Script → Presenter/Scene Planner → Video Provider Selection
 → Video Generation Queue → Voice/Native Audio → Brand Overlay (FFmpeg)

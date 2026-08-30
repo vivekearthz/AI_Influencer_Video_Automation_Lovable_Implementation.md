@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+.env.local
+
+# Generated audio/video are uploaded as a GitHub Actions artifact instead of
+# being committed (see .github/workflows/music-automation-cron.yml) -- keeps
+# git history small.
+assets/
+!assets/.gitkeep
+
+# data/songs.json IS intentionally committed by the scheduled workflow --
+# that's how pipeline state survives between ephemeral Actions runs without
+# a hosted database. If you want local test runs to not touch it, point
+# DB_FILE_PATH at somewhere outside the repo (e.g. /tmp/songs.json).
+*.log
