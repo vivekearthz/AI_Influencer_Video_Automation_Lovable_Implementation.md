@@ -3,7 +3,7 @@ import { publishToYoutube, type YoutubeClient } from '../src/pipeline/4-publish-
 import { BufferPublisher, type HttpClient as BufferHttp } from '../src/pipeline/social-publishers/buffer-publisher.js';
 import { PostizPublisher, type HttpClient as PostizHttp } from '../src/pipeline/social-publishers/postiz-publisher.js';
 import { publishToSoundcloud, SoundCloudPublisher } from '../src/pipeline/4-publish-soundcloud.js';
-import { notifyForReview, type HttpClient as SlackHttp } from '../src/pipeline/5-notify-review.js';
+import { notifyForReview } from '../src/pipeline/5-notify-review.js';
 
 describe('publishToYoutube', () => {
   it('delegates to the injected client and reports zero marginal cost', async () => {
@@ -94,9 +94,10 @@ describe('SoundCloudPublisher', () => {
 });
 
 describe('notifyForReview', () => {
-  it('is a no-op when SLACK_WEBHOOK_URL is unset', async () => {
-    const fakeHttp: SlackHttp = { fetch: vi.fn() as any };
-    await notifyForReview('song-1', 'title', '/tmp/v.mp4', 'org/repo', fakeHttp);
-    expect(fakeHttp.fetch).not.toHaveBeenCalled();
+  it('makes no network calls when Slack/email/WhatsApp are all unconfigured (the test default)', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    await notifyForReview('song-1', 'title', '/tmp/v.mp4', 'org/repo');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 });

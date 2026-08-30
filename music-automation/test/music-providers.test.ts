@@ -2,8 +2,11 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ElevenLabsMusicProvider, type HttpClient } from '../src/pipeline/music-providers/elevenlabs-provider.js';
-import { SunoExperimentalProvider } from '../src/pipeline/music-providers/suno-experimental-provider.js';
+import {
+  AceStepMusicProvider,
+  parseGradioSseForAudio,
+  type HttpClient,
+} from '../src/pipeline/music-providers/acestep-provider.js';
 import type { Lyrics } from '../src/db/types.js';
 
 const lyrics: Lyrics = {
@@ -17,48 +20,76 @@ const lyrics: Lyrics = {
   tags: ['startup', 'founder'],
 };
 
-describe('ElevenLabsMusicProvider', () => {
-  it('sends a composition plan built from lyrics and writes the returned audio to disk', async () => {
-    let capturedBody: any = null;
+// A real "event: complete" SSE block captured from a live, successful
+// generation against the public ACE-Step Space on 2026-08-30 (see
+// acestep-provider.ts for the full verification note).
+const REAL_COMPLETE_SSE =
+  'event: complete\n' +
+  'data: [{"path": "/tmp/gradio/abc/output.mp3", ' +
+  '"url": "https://ace-step-ace-step.hf.space/gradio_api/file=/tmp/gradio/abc/output.mp3", ' +
+  '"size": null, "orig_name": "output.mp3", "mime_type": null, "is_stream": false, ' +
+  '"meta": {"_type": "gradio.FileData"}}, {"task": "text2music"}]\n\n';
+
+describe('parseGradioSseForAudio', () => {
+  it('extracts the audio FileData from a real captured complete event', () => {
+    const file = parseGradioSseForAudio(REAL_COMPLETE_SSE);
+    expect(file.url).toBe('https://ace-step-ace-step.hf.space/gradio_api/file=/tmp/gradio/abc/output.mp3');
+  });
+
+  it('picks the last complete event when there were earlier heartbeat/progress events', () => {
+    const stream = 'event: heartbeat\ndata: {}\n\n' + REAL_COMPLETE_SSE;
+    const file = parseGradioSseForAudio(stream);
+    expect(file.orig_name).toBe('output.mp3');
+  });
+
+  it('throws with the server message on an error event', () => {
+    const stream = 'event: error\ndata: "GPU quota exceeded"\n\n';
+    expect(() => parseGradioSseForAudio(stream)).toThrow(/GPU quota exceeded/);
+  });
+
+  it('throws a clear error if the stream never completes', () => {
+    expect(() => parseGradioSseForAudio('event: heartbeat\ndata: {}\n\n')).toThrow(/without a complete/);
+  });
+});
+
+describe('AceStepMusicProvider', () => {
+  it('submits the exact 22-parameter payload verified against the live Space, then downloads the result', async () => {
+    let submittedBody: any = null;
     const fakeHttp: HttpClient = {
       fetch: async (url, init) => {
-        capturedBody = JSON.parse(init.body as string);
-        expect(url).toBe('https://api.elevenlabs.io/v1/music');
-        expect(init.headers).toMatchObject({ 'xi-api-key': 'key-123' });
-        return new Response(new Uint8Array([1, 2, 3, 4]).buffer, { status: 200 });
+        if (url.endsWith('/gradio_api/call/__call__')) {
+          submittedBody = JSON.parse(init.body as string);
+          return new Response(JSON.stringify({ event_id: 'evt-123' }), { status: 200 });
+        }
+        if (url.includes('/gradio_api/call/__call__/evt-123')) {
+          return new Response(REAL_COMPLETE_SSE, { status: 200 });
+        }
+        if (url.includes('gradio_api/file=')) {
+          return new Response(new Uint8Array([1, 2, 3, 4]).buffer, { status: 200 });
+        }
+        throw new Error(`unexpected fetch: ${url}`);
       },
     };
 
-    const provider = new ElevenLabsMusicProvider('key-123', 'music_v2', fakeHttp);
+    const provider = new AceStepMusicProvider('https://ace-step-ace-step.hf.space', '', fakeHttp);
     const dir = mkdtempSync(join(tmpdir(), 'music-automation-'));
     const outputPath = join(dir, 'song.mp3');
 
     const result = await provider.generateSong(lyrics, outputPath);
 
     expect(result.audioPath).toBe(outputPath);
-    expect(result.costCents).toBeGreaterThan(0);
+    expect(result.costCents).toBe(0); // free
     expect(readFileSync(outputPath)).toEqual(Buffer.from([1, 2, 3, 4]));
-    expect(capturedBody.composition_plan.chunks).toHaveLength(2);
-    expect(capturedBody.composition_plan.positive_global_styles).toContain('indie folk-pop');
+
+    expect(submittedBody.data).toHaveLength(22);
+    expect(submittedBody.data[1]).toContain('indie folk-pop'); // Tags
+    expect(submittedBody.data[2]).toContain('[verse]'); // Lyrics
+    expect(submittedBody.data[2]).toContain('line three');
   });
 
-  it('throws a clear, actionable error when the API key is missing', async () => {
-    const provider = new ElevenLabsMusicProvider('', 'music_v2', { fetch: async () => new Response() });
-    await expect(provider.generateSong(lyrics, '/tmp/x.mp3')).rejects.toThrow(/ELEVENLABS_API_KEY/);
-  });
-
-  it('surfaces the API error body on a non-2xx response', async () => {
-    const fakeHttp: HttpClient = {
-      fetch: async () => new Response('rate limited', { status: 429 }),
-    };
-    const provider = new ElevenLabsMusicProvider('key-123', 'music_v2', fakeHttp);
-    await expect(provider.generateSong(lyrics, '/tmp/x.mp3')).rejects.toThrow(/429/);
-  });
-});
-
-describe('SunoExperimentalProvider', () => {
-  it('refuses to run unless an explicit third-party base URL has been vetted and set', async () => {
-    const provider = new SunoExperimentalProvider('', '');
-    await expect(provider.generateSong(lyrics, '/tmp/x.mp3')).rejects.toThrow(/no official public API/);
+  it('surfaces the server error when job submission fails', async () => {
+    const fakeHttp: HttpClient = { fetch: async () => new Response('busy', { status: 503 }) };
+    const provider = new AceStepMusicProvider('https://ace-step-ace-step.hf.space', '', fakeHttp);
+    await expect(provider.generateSong(lyrics, '/tmp/x.mp3')).rejects.toThrow(/503/);
   });
 });

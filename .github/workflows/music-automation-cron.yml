@@ -46,9 +46,13 @@ jobs:
 
       - name: Run one pipeline pass
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-          MUSIC_PROVIDER: ${{ vars.MUSIC_PROVIDER }}
+          # Free lyrics LLM (Groq by default, or your own OmniBridge/Gemini/OpenRouter)
+          LYRICS_API_BASE_URL: ${{ vars.LYRICS_API_BASE_URL }}
+          LYRICS_API_KEY: ${{ secrets.LYRICS_API_KEY }}
+          LYRICS_MODEL: ${{ vars.LYRICS_MODEL }}
+          # Free, open-source music (public ACE-Step Space by default, or your own self-hosted instance)
+          ACE_STEP_BASE_URL: ${{ vars.ACE_STEP_BASE_URL }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
@@ -62,6 +66,17 @@ jobs:
           SOUNDCLOUD_CLIENT_ID: ${{ secrets.SOUNDCLOUD_CLIENT_ID }}
           SOUNDCLOUD_ACCESS_TOKEN: ${{ secrets.SOUNDCLOUD_ACCESS_TOKEN }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          EMAIL_ENABLED: ${{ vars.EMAIL_ENABLED }}
+          SMTP_HOST: ${{ vars.SMTP_HOST }}
+          SMTP_PORT: ${{ vars.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+          EMAIL_TO: ${{ vars.EMAIL_TO }}
+          WHATSAPP_ENABLED: ${{ vars.WHATSAPP_ENABLED }}
+          WHATSAPP_PHONE_NUMBER_ID: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
+          WHATSAPP_ACCESS_TOKEN: ${{ secrets.WHATSAPP_ACCESS_TOKEN }}
+          WHATSAPP_TO_NUMBER: ${{ vars.WHATSAPP_TO_NUMBER }}
           AUTO_APPROVE: ${{ vars.AUTO_APPROVE }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SOURCE_THEMES: ${{ vars.SOURCE_THEMES }}
