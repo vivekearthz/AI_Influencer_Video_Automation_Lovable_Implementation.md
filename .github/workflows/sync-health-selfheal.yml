@@ -1,0 +1,130 @@
+name: GitHub/Lovable sync health (self-healing monitor)
+
+# Detects the *symptoms* of a broken GitHub <-> Lovable connection that are
+# visible from the GitHub side (a sync branch disappearing, or an app's
+# required files vanishing from the root of its sync branch), and keeps a
+# single tracking issue open with retrying, self-resetting status.
+#
+# This workflow cannot repair the Lovable-side GitHub App authorization
+# itself — no script can, since that requires an account owner to complete
+# an OAuth/GitHub App consent step in both GitHub's and Lovable's UIs. See
+# docs/integration-connections.md for the manual recovery runbook and for
+# why this boundary exists.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *" # every 30 minutes
+  push:
+    branches: [main]
+  workflow_dispatch: {} # allow manual "Run workflow" from the Actions tab
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: sync-health-selfheal
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run sync health check
+        id: healthcheck
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set +e
+          node scripts/check-sync-health.mjs > /tmp/report.json
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          cat /tmp/report.json
+
+      - name: Reconcile tracking issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const exitCode = "${{ steps.healthcheck.outputs.exit_code }}";
+            const healthy = exitCode === "0";
+            const label = "sync-health";
+            let report = "(no report produced — the check script crashed; see the workflow logs)";
+            try {
+              report = fs.readFileSync('/tmp/report.json', 'utf8');
+            } catch (e) {}
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+            });
+            const existing = issues[0];
+
+            if (healthy) {
+              if (existing) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: existing.number,
+                  body: `✅ Recovered — the sync health check passed again as of ${new Date().toISOString()}.\n\n<details><summary>Latest report</summary>\n\n\`\`\`json\n${report}\n\`\`\`\n</details>`,
+                });
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: existing.number,
+                  state: 'closed',
+                });
+              }
+              console.log('Healthy — nothing to do.');
+              return;
+            }
+
+            const body = [
+              `The GitHub/Lovable sync health check failed as of ${new Date().toISOString()}.`,
+              '',
+              'This monitor can only detect symptoms visible from the GitHub side ' +
+                '(missing sync branch, or missing required files at the root of a ' +
+                'sync branch). It **cannot** repair a broken Lovable GitHub App ' +
+                'authorization — that always needs a human to complete an OAuth/' +
+                'GitHub App consent step. See `docs/integration-connections.md` ' +
+                'for the manual recovery runbook (check the installed GitHub App\'s ' +
+                'repo access, then Disconnect + reconnect from scratch in the ' +
+                'Lovable project\'s Settings → GitHub, and contact Lovable support ' +
+                'if a fresh reconnect still 404s).',
+              '',
+              '<details><summary>Latest report</summary>',
+              '',
+              '```json',
+              report,
+              '```',
+              '</details>',
+            ].join('\n');
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '🔴 GitHub/Lovable sync health check failing',
+                body,
+                labels: [label],
+              });
+            }
+
+      - name: Fail the job if unhealthy
+        if: steps.healthcheck.outputs.exit_code != '0'
+        run: exit 1
