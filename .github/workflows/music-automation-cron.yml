@@ -1,0 +1,90 @@
+name: Music automation pipeline
+
+# Scheduled runner for music-automation/ (see music-automation/README.md).
+# Runs entirely on GitHub Actions' free-for-public-repos minutes -- no VPS,
+# no always-on process, no bill regardless of your account's billing state
+# (see the "Free hosting" section of the README, and the precedent already
+# used in this account's lovable-audit-scheduler repo).
+#
+# State (data/songs.json) is committed back to the repo between runs so the
+# pipeline remembers where every song is without a hosted database. Large
+# generated media (audio/video) is uploaded as a workflow artifact instead
+# of being committed, so the git history stays small.
+
+on:
+  schedule:
+    - cron: "0 * * * *" # hourly -- cheap no-op runs when there's nothing due
+  workflow_dispatch: {} # allow manual "Run workflow" from the Actions tab
+
+concurrency:
+  group: music-automation-cron
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: music-automation
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: music-automation/package-lock.json
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run one pipeline pass
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          MUSIC_PROVIDER: ${{ vars.MUSIC_PROVIDER }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          SOCIAL_PUBLISHER: ${{ vars.SOCIAL_PUBLISHER }}
+          BUFFER_ACCESS_TOKEN: ${{ secrets.BUFFER_ACCESS_TOKEN }}
+          BUFFER_CHANNEL_IDS: ${{ vars.BUFFER_CHANNEL_IDS }}
+          POSTIZ_BASE_URL: ${{ vars.POSTIZ_BASE_URL }}
+          POSTIZ_API_KEY: ${{ secrets.POSTIZ_API_KEY }}
+          POSTIZ_INTEGRATION_IDS: ${{ vars.POSTIZ_INTEGRATION_IDS }}
+          SOUNDCLOUD_ENABLED: ${{ vars.SOUNDCLOUD_ENABLED }}
+          SOUNDCLOUD_CLIENT_ID: ${{ secrets.SOUNDCLOUD_CLIENT_ID }}
+          SOUNDCLOUD_ACCESS_TOKEN: ${{ secrets.SOUNDCLOUD_ACCESS_TOKEN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          AUTO_APPROVE: ${{ vars.AUTO_APPROVE }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SOURCE_THEMES: ${{ vars.SOURCE_THEMES }}
+        run: npm run pipeline:run
+
+      - name: Upload rendered audio/video as a build artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: song-assets
+          path: music-automation/assets/**
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Commit updated pipeline state
+        if: always()
+        run: |
+          git config user.name "music-automation-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/songs.json 2>/dev/null || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(music-automation): update pipeline state [skip ci]"
+            git push
+          else
+            echo "No state changes to commit."
+          fi
